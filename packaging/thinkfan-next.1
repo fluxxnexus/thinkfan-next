@@ -1,0 +1,143 @@
+.TH THINKFAN-NEXT 1 "October 2026" "thinkfan-next 1.0.0"
+.SH NAME
+thinkfan-next \- YAML-only Rust temperature-based fan controller
+.SH SYNOPSIS
+.B thinkfan-next
+.RB [ \-c " FILE"]
+.RB [ \-s " SECONDS"]
+.RB [ \-b " BIAS"]
+.RB [ \-nvdq ]
+.RB [ \-p " [SECONDS]"]
+.RB [ \-\-check | \-\-check-hardware ]
+.RB [ \-\-dry-run ]
+.RB [ \-\-once ]
+.SH DESCRIPTION
+Read configured temperatures and control Linux hwmon PWM or ThinkPad fans.
+Always runs in the foreground. Use a service manager for background operation.
+.SH CONFIGURATION
+Only YAML is supported. The default is /etc/thinkfan.yaml.
+No other configuration file is tried automatically.
+The YAML mapping contains sensors, fans and global or per-fan levels.
+Simple levels use [speed, lower, upper] arrays. Detailed levels use speed,
+lower_limit and upper_limit mappings. Multiple fans require speed arrays
+in global levels. Temperature units are degrees Celsius.
+Optional control.down_delay_seconds (default 0) requires sustained cooling
+before each single-level downgrade. Fans may override down_delay_seconds.
+The control.prediction mapping configures rise_rate (0.4 Celsius/second),
+rate_smoothing_seconds (2), bias_decay_seconds (25), max_bias (30 Celsius),
+and max_sample_gap_seconds (120). Timing uses actual monotonic elapsed time.
+Sensors may set read_timeout_seconds independently of data expiry (default:
+twice the base interval). The daemon uses six workers partitioned into
+fast reads (two), NVML, SMART, preparation and fan discovery. Repeated commands
+may be coalesced; periodic mode/watchdog maintenance is preserved.
+Sensors may set interval_seconds (0.1 to 86400) and max_age_seconds
+(strictly greater than the interval; default twice the interval).
+Expired required data requests each fan's configured final level. Cached readings do not count as
+new acquisitions for rise prediction or continuous-cooling evidence.
+Blocking reads occupy their worker partition; completion notifications wake
+the main loop. Timed-out calls cannot be cancelled and no replacement workers
+are created. Depulse is skipped when it would cross the next sampling deadline.
+.SH OPTIONS
+.TP
+.BR \-c , " --config FILE"
+Use exactly this YAML configuration file, regardless of its extension.
+.TP
+.BR \-s , " --interval SECONDS"
+Maximum sampling interval, 0.1 to 60 seconds. Default 5.
+Rising temperature shortens the adaptive interval to at most 2 seconds.
+Recovery adds one second per base interval of fresh acquisition time,
+up to the configured maximum. Cached samples do not advance recovery.
+.TP
+.BR \-b , " --bias BIAS"
+Signed rise prediction factor, -10 to 30. Default 0 (no bias).
+The prediction horizon is BIAS/2 seconds, applied to the time-smoothed
+temperature rise rate. Decay and amplitude limits are configured in YAML.
+.TP
+.BR \-d , " --no-disk-wakeup"
+Skip sleeping SMART disks instead of waking them for a reading.
+.TP
+.BR \-p , " --depulse [SECONDS]"
+Enable the ThinkPad pulsing-fan workaround. Bare -p uses 0.5 seconds.
+.TP
+.B --watchdog SECONDS
+ThinkPad kernel watchdog timeout, 1 to 120 seconds. Default 120.
+Must exceed the sampling interval plus depulse duration plus one second.
+.TP
+.B --check
+Validate configuration without accessing hardware.
+.TP
+.B --check-hardware
+Validate and read hardware without writing fan state.
+.TP
+.B --dry-run
+Read inputs and print decisions without changing fans or watchdogs.
+Routine summaries are coalesced to the base interval; state and target
+changes are reported immediately. Use -v for every decision.
+.TP
+.B --once
+Run one cycle, restore initial state and exit.
+.TP
+.B --lock-file PATH
+Use this instance lock. Default /run/thinkfan-next.lock.
+.TP
+.BR \-n , " --foreground"
+Stay in foreground, which is already the default.
+.TP
+.BR \-v , " --verbose"
+Print every sample and decision; enable DEBUG logs. Repeat for TRACE.
+.TP
+.BR \-q , " --quiet"
+Suppress the startup announcement. Diagnostics remain enabled.
+.TP
+.B --log-output auto|console|journal
+Select the logging destination. Default auto verifies JOURNAL_STREAM against
+stderr device and inode. Console forces human-readable stderr output;
+journal sends structured events directly to journald.
+.SH ENVIRONMENT
+.TP
+.B RUST_LOG
+Tracing filter directives, for example thinkfan_next=debug. Overrides the
+verbosity default (INFO, DEBUG for -v, TRACE for -vv). Invalid directives
+produce a warning and fall back to the verbosity default. Dry-run decisions
+and USR1 snapshots use INFO and can be hidden by an explicit filter.
+.SH LOGGING
+Console logs include local date/time and UTC offset. Module paths are shown
+with -v or for DEBUG/TRACE events. Level colors require a terminal on stderr
+and an unset NO_COLOR environment variable.
+Sample summaries label sensor channels and temperatures in Celsius.
+Targets are ThinkPad levels or PWM values, not measured RPM. Startup waiting,
+read failures, expiry and cooling delay have distinct labels. Predicted
+temperatures are shown only when they differ from measured values.
+Journal logs use tracing-journald with ERROR=3, WARN=4, INFO=6 and DEBUG/TRACE=7.
+Event fields use the F_ prefix, such as F_SENSOR and F_BACKEND.
+Journal initialization failure falls back to stderr with a warning.
+Check/help/version output remains on stdout. Quiet mode suppresses only the
+startup announcement.
+.SH THINKPAD SETUP
+ThinkPad fan writes require the thinkpad_acpi module parameter fan_control=1.
+The supplied modprobe.d file sets this option when the module loads. Reboot after
+installing it; rebuild the initramfs first if it loads the driver early.
+For a built-in driver, use thinkpad_acpi.fan_control=1 on the kernel command line.
+.SH SUSPEND INTEGRATION
+Sleep handling is signal-driven; automatic logind monitoring is not implemented.
+The systemd sleep helper signals only thinkfan-next.service, not processes
+launched manually in a terminal. Such processes require separate sleep integration.
+.SH SIGNALS
+INT and TERM restore original fan state and exit. HUP reloads configuration;
+invalid replacements leave the current configuration active. USR1 prints
+temperatures, target speeds and worker statistics. PWR releases control and pauses; USR2 resumes control
+with a bounded hardware recovery interval.
+.SH ERRORS
+Fatal runtime failures request each fan's configured final level and leave the protective state
+in place. Writes may still fail if a driver or device is unavailable.
+Optional inputs retain their array positions when unavailable. All inputs
+unavailable is a fatal error. Required inputs in their retry budget cause
+the configured final level until they recover.
+If that command fails, PWM retains the unregulated full-speed fallback and
+ThinkPad retains the automatic-mode fallback.
+.SH EXIT STATUS
+0 on success or a clean signal exit; 1 on configuration, hardware or runtime
+failure; 2 on command-line syntax errors.
+.SH SEE ALSO
+The examples and configuration reference shipped in the source repository.
+Linux kernel hwmon and thinkpad-acpi documentation.

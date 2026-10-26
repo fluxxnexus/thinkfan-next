@@ -1,0 +1,9 @@
+/target/
+
+/build/
+*.pkg.tar.*
+
+# Local agent and credential directories
+.agents/
+.codex/
+.aws/

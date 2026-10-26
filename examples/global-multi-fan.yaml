@@ -1,0 +1,20 @@
+sensors:
+  - hwmon: /sys/class/hwmon
+    name: coretemp
+    indices: [1, 2]
+    correction: [0, 2]
+fans:
+  - hwmon: /sys/class/hwmon
+    name: nct6775
+    indices: [1]
+  - hwmon: /sys/class/hwmon
+    name: nct6775
+    indices: [2]
+levels:
+  - speed: [80, 90]
+    upper_limit: [50, 55]
+  - speed: [160, 180]
+    lower_limit: [45, 50]
+    upper_limit: [70, 75]
+  - speed: [255, 255]
+    lower_limit: [65, 70]

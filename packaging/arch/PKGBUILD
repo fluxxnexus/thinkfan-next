@@ -1,0 +1,70 @@
+# Build from the local source archive produced by prepare.py.
+# prepare.py replaces pkgver and the archive checksum from the current checkout.
+pkgname=thinkfan-next
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='YAML-only Rust fan controller for Linux'
+arch=('x86_64')
+license=('GPL-3.0-or-later')
+depends=('glibc' 'gcc-libs' 'lm_sensors')
+makedepends=('rust' 'clang')
+optdepends=(
+  'nvidia-utils: NVIDIA NVML temperature sensors'
+  'libatasmart: ATA SMART temperature sensors'
+)
+options=('!lto')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+_cargo_env() {
+  export CARGO_HOME="$srcdir/cargo-home"
+  export CARGO_TARGET_DIR="$srcdir/target"
+  local mapping="--remap-path-prefix=${srcdir}=/usr/src/debug/${pkgname}"
+  if [[ " ${RUSTFLAGS:-} " != *" $mapping "* ]]; then
+    export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }$mapping"
+  fi
+}
+
+prepare() {
+  cd "$srcdir/$pkgname-$pkgver"
+  _cargo_env
+  cargo fetch --locked --target x86_64-unknown-linux-gnu
+}
+
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+  _cargo_env
+  cargo build --frozen --release --target x86_64-unknown-linux-gnu
+}
+
+check() {
+  cd "$srcdir/$pkgname-$pkgver"
+  _cargo_env
+  cargo test --frozen --release --target x86_64-unknown-linux-gnu
+  for config in examples/*.yaml; do
+    "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/thinkfan-next" --check -c "$config"
+  done
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  install -Dm755 "$srcdir/target/x86_64-unknown-linux-gnu/release/thinkfan-next" \
+    "$pkgdir/usr/bin/thinkfan-next"
+  install -Dm644 packaging/thinkfan-next.1 "$pkgdir/usr/share/man/man1/thinkfan-next.1"
+  install -Dm644 packaging/modprobe.d/thinkfan-next.conf \
+    "$pkgdir/usr/lib/modprobe.d/thinkfan-next.conf"
+  install -Dm644 packaging/systemd/thinkfan-next-sleep.service \
+    "$pkgdir/usr/lib/systemd/system/thinkfan-next-sleep.service"
+  install -Dm644 packaging/systemd/thinkfan-next.service \
+    "$pkgdir/usr/lib/systemd/system/thinkfan-next.service"
+  sed -i 's|/usr/local/sbin/thinkfan-next|/usr/bin/thinkfan-next|g' \
+    "$pkgdir/usr/lib/systemd/system/thinkfan-next.service"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/thinkfan-next/README.md"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/thinkfan-next/LICENSE"
+  for file in docs/*.md; do
+    install -Dm644 "$file" "$pkgdir/usr/share/doc/thinkfan-next/$file"
+  done
+  for file in examples/*.yaml; do
+    install -Dm644 "$file" "$pkgdir/usr/share/doc/thinkfan-next/$file"
+  done
+}

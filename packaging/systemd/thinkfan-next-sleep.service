@@ -1,0 +1,14 @@
+[Unit]
+Description=Release fan control during sleep and resume after waking
+Before=sleep.target
+StopWhenUnneeded=yes
+PartOf=thinkfan-next.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=-/bin/systemctl kill --kill-whom=main --signal=PWR thinkfan-next.service
+ExecStop=-/bin/systemctl kill --kill-whom=main --signal=USR2 thinkfan-next.service
+
+[Install]
+WantedBy=sleep.target

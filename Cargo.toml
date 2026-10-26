@@ -1,0 +1,34 @@
+[package]
+name = "thinkfan-next"
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.89"
+license = "GPL-3.0-or-later"
+description = "A YAML-only, safety-oriented Rust fan controller for Linux"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.6", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+noyalib-serde-yaml = "0.0.58"
+nvml-wrapper = "0.13"
+lm-sensors = "0.5"
+signal-hook = "0.4"
+signal-hook-mio = { version = "0.3", features = ["support-v1_0"] }
+mio = { version = "1.2", features = ["os-poll", "os-ext"] }
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter"] }
+libloading = "0.9"
+libc = "0.2"
+tracing-journald = "0.3"
+
+[dev-dependencies]
+tempfile = "3.27"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

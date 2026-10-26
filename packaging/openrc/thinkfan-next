@@ -1,0 +1,16 @@
+#!/sbin/openrc-run
+name="thinkfan-next"
+description="Rust temperature-based fan controller"
+supervisor="supervise-daemon"
+command="/usr/local/sbin/thinkfan-next"
+command_args="--config /etc/thinkfan.yaml"
+extra_started_commands="reload"
+depend() {
+    need localmount
+    after modules
+}
+reload() {
+    ebegin "Reloading thinkfan-next configuration"
+    supervise-daemon "$RC_SVCNAME" --signal HUP
+    eend $?
+}

@@ -1,0 +1,24 @@
+# Illustrative thresholds: adapt to your hardware before enabling fan control.
+control:
+  down_delay_seconds: 10
+sensors:
+  - hwmon: /sys/class/hwmon
+    name: coretemp
+    indices: [1]
+    interval_seconds: 1
+    read_timeout_seconds: 2
+    max_age_seconds: 3
+  - atasmart: /dev/sda
+    interval_seconds: 30
+    max_age_seconds: 65
+    optional: true
+fans:
+  - tpacpi: /proc/acpi/ibm/fan
+levels:
+  - speed: 2
+    upper_limit: [60, 45]
+  - speed: 7
+    lower_limit: [55, 40]
+    upper_limit: [85, 55]
+  - speed: full-speed
+    lower_limit: [80, 50]

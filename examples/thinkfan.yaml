@@ -1,0 +1,13 @@
+# Illustrative thresholds; adjust to the temperature ratings of your hardware.
+sensors:
+  - hwmon: /sys/class/hwmon
+    name: coretemp
+    indices: [1]
+fans:
+  - tpacpi: /proc/acpi/ibm/fan
+levels:
+  - [0, 0, 50]
+  - [2, 45, 60]
+  - [4, 55, 70]
+  - [7, 65, 80]
+  - ["level full-speed", 75, 255]

@@ -1,0 +1,26 @@
+[Unit]
+Description=Rust temperature-based fan controller
+Documentation=man:thinkfan-next(1)
+After=systemd-modules-load.service
+Conflicts=thinkfan.service fancontrol.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/thinkfan-next --config /etc/thinkfan.yaml --log-output journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=thinkfan-next
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectSystem=strict
+PrivateTmp=yes
+ReadWritePaths=/sys -/proc/acpi /run
+# PrivateDevices/ProtectKernelTunables would block required hardware access.
+
+[Install]
+WantedBy=multi-user.target
+Also=thinkfan-next-sleep.service

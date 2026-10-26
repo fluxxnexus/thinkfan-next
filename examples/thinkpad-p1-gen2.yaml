@@ -1,0 +1,71 @@
+# ThinkPad P1 Gen 2: i7-9750H, Quadro T2000, Samsung 1TB NVMe.
+# Starting profile, not a certified thermal policy; validate under real load.
+# The highest curve level and device-fault target are both 7, not full-speed.
+# No independent overtemperature protection is implemented.
+# If a fan write fails, backend fallback may request a different control mode.
+# Suggested CLI arguments: -s 2 -b 1 --watchdog 15
+# Set these explicitly on the command line or in the service ExecStart override;
+# YAML comments do not set CLI defaults.
+# Leave depulse disabled (the default).
+# Read-only validation:
+#   thinkfan-next -c examples/thinkpad-p1-gen2.yaml --check-hardware
+# Preview decisions without changing fan control:
+#   thinkfan-next -c examples/thinkpad-p1-gen2.yaml --dry-run -s 2 -b 1 --watchdog 15
+
+control:
+  # Each downshift requires at least 12 seconds of fresh cooling evidence.
+  # The SSD's 10-second sampling interval can extend the actual wait.
+  down_delay_seconds: 12
+  prediction:
+    rise_rate: 0.6
+    rate_smoothing_seconds: 3
+    bias_decay_seconds: 10
+    max_bias: 8
+    max_sample_gap_seconds: 30
+
+sensors:
+  # CPU package and all six cores; any hot channel can raise the fan level.
+  - hwmon: /sys/class/hwmon
+    name: coretemp
+    indices: [1, 2, 3, 4, 5, 6, 7]
+    max_errors: 2
+
+  # Required GPU input: read failures request protection, not silent omission.
+  - nvml: "0000:01:00.0"
+    max_errors: 2
+
+  # Use the composite temperature and match the actual SSD model.
+  # Observed hwmon critical temperature: 84.85 C.
+  - hwmon: /sys/class/hwmon
+    name: nvme
+    model: SAMSUNG MZVLB1T0HBLR-000L7
+    indices: [1]
+    interval_seconds: 10
+    max_age_seconds: 25
+    max_errors: 2
+
+fans:
+  # One exposed control interface; do not configure its hwmon alias as well.
+  - tpacpi: /proc/acpi/ibm/fan
+    max_errors: 1
+
+# Nine columns: CPU package, Core 0..5, NVIDIA GPU, SSD composite.
+# The minimum configured level is 1, avoiding level-0 fan stops.
+# This is not a fixed startup level: pending required readings can request level 7.
+# Initial curve selection uses temperature and hysteresis; subsequent downshifts
+# require sustained cooling and drop one configured level at a time.
+# Upshifts can cross multiple configured levels immediately.
+levels:
+  - speed: 1
+    upper_limit: [60, 60, 60, 60, 60, 60, 60, 55, 50]
+
+  - speed: 3
+    lower_limit: [55, 55, 55, 55, 55, 55, 55, 50, 45]
+    upper_limit: [70, 70, 70, 70, 70, 70, 70, 65, 57]
+
+  - speed: 5
+    lower_limit: [65, 65, 65, 65, 65, 65, 65, 60, 52]
+    upper_limit: [80, 80, 80, 80, 80, 80, 80, 73, 63]
+
+  - speed: 7
+    lower_limit: [75, 75, 75, 75, 75, 75, 75, 68, 58]

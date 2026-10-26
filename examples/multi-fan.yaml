@@ -1,0 +1,34 @@
+# All limits are Celsius. Input ordering is CPU, GPU, then disk.
+sensors:
+  - hwmon: /sys/class/hwmon
+    name: coretemp
+    indices: [1]
+  - nvml: '01:00.0'
+    optional: true
+  - hwmon: /sys/class/hwmon
+    name: nvme
+    model: 'REPLACE WITH YOUR DISK MODEL'
+    indices: [1]
+fans:
+  - hwmon: /sys/class/hwmon
+    name: nct6775
+    indices: [1]
+    levels:
+      - speed: 80
+        upper_limit: [50, '_', 40]
+      - speed: 160
+        lower_limit: [45, '_', 35]
+        upper_limit: [70, '_', 50]
+      - speed: 255
+        lower_limit: [65, '_', 45]
+  - hwmon: /sys/class/hwmon
+    name: nct6775
+    indices: [2]
+    levels:
+      - speed: 90
+        upper_limit: [55, 55, 40]
+      - speed: 180
+        lower_limit: [50, 50, 35]
+        upper_limit: [75, 75, 50]
+      - speed: 255
+        lower_limit: [70, 70, 45]

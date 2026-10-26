@@ -1,0 +1,56 @@
+name: Arch Linux package
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: archlinux-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install build dependencies
+        run: pacman -Syu --noconfirm --needed git rust clang lm_sensors python
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prepare local source archive
+        run: |
+          python packaging/arch/prepare.py /tmp/thinkfan-package
+          useradd --create-home builder
+          chown -R builder:builder /tmp/thinkfan-package
+      - name: Build and test as an unprivileged user
+        run: |
+          runuser -u builder -- bash -c 'cd /tmp/thinkfan-package && makepkg --noconfirm --cleanbuild'
+      - name: Verify package contents and installation
+        run: |
+          mkdir -p artifacts
+          cp /tmp/thinkfan-package/*.pkg.tar.zst artifacts/
+          pacman -U --noconfirm artifacts/*.pkg.tar.zst
+          thinkfan-next --version
+          test -f /usr/lib/modprobe.d/thinkfan-next.conf
+          grep -Fx 'options thinkpad_acpi fan_control=1' /usr/lib/modprobe.d/thinkfan-next.conf
+          grep -F 'ExecStart=/usr/bin/thinkfan-next ' /usr/lib/systemd/system/thinkfan-next.service
+          for config in /usr/share/doc/thinkfan-next/examples/*.yaml; do
+            thinkfan-next --check -c "$config"
+          done
+          cd artifacts
+          sha256sum *.pkg.tar.zst > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thinkfan-next-archlinux-x86_64-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
