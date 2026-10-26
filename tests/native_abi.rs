@@ -127,6 +127,7 @@ fn lm_sensors_rejects_failures_and_cleans_up() {
             .env("LD_LIBRARY_PATH", root.path())
             .env("THINKFAN_TEST_LOG", &log)
             .env("THINKFAN_TEST_LM_FAILURE", failure)
+            .env("THINKFAN_TEST_LM_SLOW_CLEANUP", "1")
             .arg("-c")
             .arg(&config)
             .args(["--dry-run", "--once"])
@@ -142,7 +143,11 @@ fn lm_sensors_rejects_failures_and_cleans_up() {
         assert!(stderr.contains(expected), "{stderr}");
         let calls = fs::read_to_string(log).unwrap();
         assert_eq!(calls.matches("sensors init\n").count(), 1);
-        assert_eq!(calls.matches("sensors cleanup\n").count(), 1);
+        assert_eq!(
+            calls.matches("sensors cleanup\n").count(),
+            1,
+            "{failure}: {calls}"
+        );
         assert_eq!(fs::read_to_string(root.path().join("pwm")).unwrap(), "77");
     }
 }
@@ -157,6 +162,7 @@ fn libsensors_batches_entries_and_keeps_optional_failures_local() {
         .env_remove("RUST_LOG")
         .env("LD_LIBRARY_PATH", root.path())
         .env("THINKFAN_TEST_LOG", &log)
+        .env("THINKFAN_TEST_LM_SLOW_CLEANUP", "1")
         .arg("-c")
         .arg(&config)
         .args(["--dry-run", "--once"])

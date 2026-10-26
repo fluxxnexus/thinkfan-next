@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 static void log_call(const char *message) {
     FILE *f = fopen(getenv("THINKFAN_TEST_LOG"), "a");
     if (f) { fprintf(f, "%s\n", message); fclose(f); }
@@ -62,7 +63,11 @@ int sensors_init(FILE *file) {
     }
     return 0;
 }
-void sensors_cleanup(void) { log_call("sensors cleanup"); }
+void sensors_cleanup(void) {
+    /* Widen the publication/exit race without relying on runner speed. */
+    if (getenv("THINKFAN_TEST_LM_SLOW_CLEANUP")) usleep(100000);
+    log_call("sensors cleanup");
+}
 const sensors_chip_name *sensors_get_detected_chips(const sensors_chip_name *match, int *cursor) { (void)match; return (*cursor)++ ? NULL : &chip; }
 int sensors_snprintf_chip_name(char *out, size_t size, const sensors_chip_name *name) { (void)name; return snprintf(out, size, "test-chip"); }
 const sensors_feature *sensors_get_features(const sensors_chip_name *name, int *cursor) { (void)name; if (*cursor >= 2) return NULL; return &features[(*cursor)++]; }

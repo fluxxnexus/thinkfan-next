@@ -38,13 +38,28 @@ jobs:
         run: |
           mkdir -p artifacts
           cp /tmp/thinkfan-package/*.pkg.tar.zst artifacts/
-          pacman -U --noconfirm artifacts/*.pkg.tar.zst
+          pacman -Qqlp artifacts/*.pkg.tar.zst > /tmp/thinkfan-package-files
+          for file in README.md docs/*.md examples/*.yaml; do
+            grep -Fx "/usr/share/doc/thinkfan-next/$file" /tmp/thinkfan-package-files
+          done
+          # The official container skips usr/share/doc/* during installation.
+          # Apply a project-only exception after all included container rules.
+          cp /etc/pacman.conf /tmp/thinkfan-pacman.conf
+          cat >> /tmp/thinkfan-pacman.conf <<'EOF'
+
+          [options]
+          NoExtract = !usr/share/doc/thinkfan-next/*
+          EOF
+          pacman --config /tmp/thinkfan-pacman.conf -U --noconfirm artifacts/*.pkg.tar.zst
           thinkfan-next --version
           test -f /usr/lib/modprobe.d/thinkfan-next.conf
           grep -Fx 'options thinkpad_acpi fan_control=1' /usr/lib/modprobe.d/thinkfan-next.conf
           grep -F 'ExecStart=/usr/bin/thinkfan-next ' /usr/lib/systemd/system/thinkfan-next.service
-          for config in /usr/share/doc/thinkfan-next/examples/*.yaml; do
-            thinkfan-next --check -c "$config"
+          for file in README.md docs/*.md examples/*.yaml; do
+            test -f "/usr/share/doc/thinkfan-next/$file"
+          done
+          for config in examples/*.yaml; do
+            thinkfan-next --check -c "/usr/share/doc/thinkfan-next/$config"
           done
           cd artifacts
           sha256sum *.pkg.tar.zst > SHA256SUMS

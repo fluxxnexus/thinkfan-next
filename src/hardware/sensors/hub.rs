@@ -209,7 +209,7 @@ impl SensorHub {
                 Box::new(move || {
                     // Publish each entry before reading the next one. A slow later
                     // channel cannot hide an already completed temperature.
-                    let lm = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let mut lm = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         devices
                             .iter()
                             .any(|(_, d)| d.is_lm())
@@ -218,11 +218,18 @@ impl SensorHub {
                     .unwrap_or_else(|_| {
                         Some(Err(anyhow::anyhow!("libsensors initialization panicked")))
                     });
-                    for (index, mut device) in devices {
+                    let mut devices = devices.into_iter().peekable();
+                    while let Some((index, mut device)) = devices.next() {
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             read_device(&mut device, lm.as_ref())
                         }))
                         .unwrap_or_else(|_| Err(anyhow::anyhow!("sensor backend panicked")));
+                        // The final completion may let --once exit immediately.
+                        // Release the session first, without delaying earlier
+                        // channels. Cleanup remains subject to the read timeout.
+                        if devices.peek().is_none() {
+                            drop(lm.take());
+                        }
                         // Timestamp and publication share the timeout check lock.
                         // No hardware access occurs while this lock is held.
                         let published = {
