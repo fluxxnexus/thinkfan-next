@@ -280,7 +280,7 @@ fn run_loop(
                         .policy
                         .force_emergency(DecisionReason::SensorFault);
                     controller.emergency_all();
-                    if !wake_deadline.is_some_and(|d| Instant::now() < d) {
+                    if wake_deadline.is_none_or(|d| Instant::now() >= d) {
                         return Err(error);
                     }
                 }
